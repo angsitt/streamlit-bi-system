@@ -20,18 +20,22 @@ CREATE TABLE hr_brand.cities
 	FOREIGN KEY (country_id) REFERENCES hr_brand.countries (id)
 );
 
+ALTER TABLE hr_brand.cities ALTER COLUMN city_rus VARCHAR(20)
+  COLLATE Cyrillic_General_CI_AS;
+
 CREATE TABLE hr_brand.employees
 (
 	id INT IDENTITY PRIMARY KEY,
 	job_title VARCHAR(100),
 	work_experience VARCHAR(10),
 	is_active CHAR(1),
+	source VARCHAR(20) NOT NULL,
 	city_id INT DEFAULT 1,
 	updated_date DATETIME DEFAULT getdate(),
 	FOREIGN KEY (city_id) REFERENCES hr_brand.cities (id)
 );
 
-CREATE TABLE hr_brand.company_reviews
+CREATE TABLE hr_brand.reviews
 (
 	id INT IDENTITY PRIMARY KEY,
 	title VARCHAR(300),
@@ -40,12 +44,32 @@ CREATE TABLE hr_brand.company_reviews
 	disadvantage VARCHAR(1000),
 	improvement_idea VARCHAR(500),
 	score DECIMAL(2,1),
+	sentiment VARCHAR(10),
+	lang VARCHAR(3) NOT NULL,
 	employee_id INT NOT NULL,
 	source VARCHAR(20) NOT NULL,
 	review_date DATETIME,
 	updated_date DATETIME DEFAULT getdate(),
 	FOREIGN KEY (employee_id) REFERENCES hr_brand.employees (id)
 );
+
+insert into hr_brand.employees (source) 
+values ('a')
+
+insert into hr_brand.reviews (review, lang, employee_id, source) 
+values ('Happy Birthday to me!', 'eng', 1, 'life')
+
+insert into [hr_brand.#update_sentiment]
+values (1, 'pos')
+
+ALTER TABLE hr_brand.reviews ALTER COLUMN title VARCHAR(300)
+  COLLATE Cyrillic_General_CI_AS;
+ALTER TABLE hr_brand.reviews ALTER COLUMN review VARCHAR(2000)
+  COLLATE Cyrillic_General_CI_AS;
+ALTER TABLE hr_brand.reviews ALTER COLUMN advantage VARCHAR(1000)
+  COLLATE Cyrillic_General_CI_AS;
+ALTER TABLE hr_brand.reviews ALTER COLUMN disadvantage VARCHAR(1000)
+  COLLATE Cyrillic_General_CI_AS;
 
 INSERT INTO hr_brand.countries (country, country_code)
 VALUES 
@@ -61,30 +85,30 @@ VALUES
 INSERT INTO hr_brand.cities (city, city_rus, country_id)
 VALUES 
 	('N/A', 'N/A', 1),
-	('Minsk', 'Минск', 2),
-	('Gomel', 'Гомель', 2),
-	('Grodno', 'Гродно', 2),
-	('Mogilev', 'Могилев', 2),
-	('Brest', 'Брест', 2),
-	('Vitebsk', 'Витебск', 2),
-	('Moscow', 'Москва', 3),
-	('Saint Petersburg', 'Санкт-Петербург', 3),
-	('Novosibirsk', 'Новосибирск', 3),
-	('Kazan', 'Казань', 3),
-	('Nizhny Novgorod', 'Нижний Новгород', 3),
-	('Samara', 'Самара', 3),
-	('Voronezh', 'Воронеж', 3),
-	('Tyumen', 'Тюмень', 3),
-	('Stavropol', 'Ставрополь', 3),
-	('Tolyatti', 'Тольятти', 3),
-	('Saratov', 'Саратов', 3),
-	('Bishkek', 'Бишкек', 4),
-	('Nur-Sultan', 'Нур-Султан', 5),
-	('Lviv', 'Львов', 6),
-	('Kiev', 'Киев', 6),
-	('Khmelnytskyi', 'Хмельницкий', 6),
-	('Kharkiv', 'Харьков', 6),
-	('Vilnius', 'Вильнюс', 7),
+	('Minsk', N'Минск', 2),
+	('Gomel', N'Гомель', 2),
+	('Grodno', N'Гродно', 2),
+	('Mogilev', N'Могилев', 2),
+	('Brest', N'Брест', 2),
+	('Vitebsk', N'Витебск', 2),
+	('Moscow', N'Москва', 3),
+	('Saint Petersburg', N'Санкт-Петербург', 3),
+	('Novosibirsk', N'Новосибирск', 3),
+	('Kazan', N'Казань', 3),
+	('Nizhny Novgorod', N'Нижний Новгород', 3),
+	('Samara', N'Самара', 3),
+	('Voronezh', N'Воронеж', 3),
+	('Tyumen', N'Тюмень', 3),
+	('Stavropol', N'Ставрополь', 3),
+	('Tolyatti', N'Тольятти', 3),
+	('Saratov', N'Саратов', 3),
+	('Bishkek', N'Бишкек', 4),
+	('Nur-Sultan', N'Нур-Султан', 5),
+	('Lviv', N'Львов', 6),
+	('Kiev', N'Киев', 6),
+	('Khmelnytskyi', N'Хмельницкий', 6),
+	('Kharkiv', N'Харьков', 6),
+	('Vilnius', N'Вильнюс', 7),
 	('San Jose', NULL, 8),
 	('Austin', NULL, 8),
 	('Los Angeles', NULL, 8),
@@ -112,4 +136,18 @@ VALUES
 select * from hr_brand.countries;
 select * from hr_brand.cities;
 select * from hr_brand.employees;
-select * from hr_brand.company_reviews;
+select * from hr_brand.reviews;
+select * from [hr_brand.#update_sentiment];
+
+create TABLE [hr_brand.#update_sentiment] (id INT PRIMARY KEY, sentiment_upd VARCHAR(10))
+
+UPDATE
+             hr_brand.reviews
+        SET
+             sentiment = u.sentiment_upd
+        FROM
+             hr_brand.reviews AS t
+        INNER JOIN 
+             [hr_brand.#update_sentiment] AS u 
+        ON
+             u.id=t.id and t.sentiment is NULL;

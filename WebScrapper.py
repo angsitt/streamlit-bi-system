@@ -312,6 +312,8 @@ class IndeedScrapper(WebScrapper):
 
     def __init__(self):
         super().__init__('https://ca.indeed.com/cmp/Epam-Systems/reviews?fcountry=ALL', 'indeed_reviews.csv')
+        self.source = "Indeed.com"
+        self.lang = 'eng'
 
     def get_pages(self, html):
         soup = BeautifulSoup(html, 'html.parser')
@@ -359,8 +361,7 @@ class IndeedScrapper(WebScrapper):
                 'advantage': advantage,
                 'disadvantage': disadvantage,
                 'score': score,
-                'review_date': review_date,
-                'source': 'Indeed'
+                'review_date': review_date
             })
         return reviews
 
@@ -368,28 +369,34 @@ class IndeedScrapper(WebScrapper):
     def save_file(self, items):
         with open(self.file_name, 'w', newline='', encoding='utf-8') as file:
             writer = csv.writer(file, delimiter=';')
-            writer.writerow(['job_title', 'location', 'current_employee', 'work_experience', 'title', 'review', 'advantage', 'disadvantage', 'score', 'review_date', 'source'])
+            writer.writerow(
+                ['job_title', 'location', 'current_employee',
+                 'work_experience', 'title', 'review',
+                 'advantage', 'disadvantage', 'score', 'review_date'])
             for item in items:
                 writer.writerow(
-                    [item['job_title'], item['location'], item['current_employee'], item['work_experience'], item['title'], item['review'], item['advantage'], item['disadvantage'], item['score'], item['review_date'], item['source']])
+                    [item['job_title'], item['location'], item['current_employee'],
+                     item['work_experience'], item['title'], item['review'],
+                     item['advantage'], item['disadvantage'], item['score'], item['review_date']]
+                )
             print('Data is written to the file successfully!')
 
     def save_to_db(self, items):
         with DBConnection(SERVER, DATABASE, DB_USERNAME, DB_PASSWORD) as db:
-            tables_to_clean = ['hr_brand.company_reviews', 'hr_brand.employees']
+            tables_to_clean = ['hr_brand.reviews', 'hr_brand.employees']
             for table in tables_to_clean:
-                sql_query = f'DELETE FROM {table}'
+                sql_query = f'DELETE FROM {table} WHERE source = \'{self.source}\''
                 db.exec_command(sql_query)
             for item in items:
-                sql_query = "INSERT INTO hr_brand.employees (job_title, is_active) VALUES (?, ?)"
+                sql_query = "INSERT INTO hr_brand.employees (job_title, is_active, source) VALUES (?, ?, ?)"
                 cursor = db.conn.cursor()
-                cursor.execute(sql_query, item['job_title'], item['current_employee'])
+                cursor.execute(sql_query, item['job_title'], item['current_employee'], self.source)
                 db.conn.commit()
                 sql_query = 'SELECT max(id) FROM hr_brand.employees'
                 id = db.exec_select(sql_query)[0][0]
-                sql_query = "INSERT INTO hr_brand.company_reviews (title, review, advantage, disadvantage, score, review_date, source, employee_id) " \
-                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-                cursor.execute(sql_query, item['title'], item['review'], item['advantage'], item['disadvantage'], item['score'], datetime.strptime(item['review_date'], "%d %B %Y"), item['source'], id)
+                sql_query = "INSERT INTO hr_brand.reviews (title, review, advantage, disadvantage, score, review_date, source, lang, employee_id) " \
+                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                cursor.execute(sql_query, item['title'], item['review'], item['advantage'], item['disadvantage'], item['score'], datetime.strptime(item['review_date'], "%d %B %Y"), self.source, self.lang, id)
                 db.conn.commit()
                 cursor.close()
             print('Data is written to the database successfully!')

@@ -106,9 +106,8 @@ elif selected == 'English Reviews':
     def sentiment_analysis(df):
         sent_pipeline = pipeline("sentiment-analysis")
         df['sentiment'] = df['review'].apply(lambda x: sent_pipeline(x)[0]['label'])
-        df['pos'] = df['sentiment'].apply(lambda x: sent_pipeline(x)[0]['score'] if x == 'POSITIVE' else None)
-        df['neg'] = df['sentiment'].apply(lambda x: sent_pipeline(x)[0]['score'] if x == 'NEGATIVE' else None)
-        return df
+        with DBConnection(SERVER, DATABASE, DB_USERNAME, DB_PASSWORD) as db:
+            db.update_sentiment(df)
 
     header = st.container()
     dataset = st.container()
@@ -118,55 +117,60 @@ elif selected == 'English Reviews':
         st.title('Reviews Sentiment Analysis')
         st.text('The purpose of the analysis:\n'
                 '- estimate EPAM Systems as an employer;\n'
-                '- define strengths and weaknesses.')
+                '- define strengths and weaknesses of EPAM HR-brand.')
 
     with dataset:
         st.header('EPAM Systems Reviews')
-        st.text('10 the most recent reviews are displayed')
         pd.set_option('display.max_columns', None)
         with DBConnection(SERVER, DATABASE, DB_USERNAME, DB_PASSWORD) as db:
-            sql_query = 'SELECT title, review, advantage, disadvantage, score, review_date ' \
-                        'FROM hr_brand.company_reviews  ' \
-                        'WHERE review is not NULL ' \
-                        'ORDER BY review_date DESC'
+            sql_query = 'SELECT r.id, r.title, r.review, r.advantage, r.disadvantage, r.score, r.review_date ' \
+                        'FROM hr_brand.reviews r ' \
+                        'WHERE r.review is not NULL AND r.lang = \'eng\' and r.sentiment is NULL ' \
+                        'ORDER BY r.review_date DESC'
             df = db.read_sql_to_df(sql_query)
-            result_df = sentiment_analysis(df)
-            st.write(df)
+            df_main = db.read_reviews_to_df('eng')
+        if df_main.shape[0] == 0:
+            st.info('There is no data in the database. '
+                    'Please go to "Web-scrapper" and parse the data from available web-source to start analysis.')
+        else:
+            st.info(f'There are {df.shape[0]} reviews that could be processed.')
+            if df.shape[0] != 0:
+                analyze_btn = st.button('Analyze')
+                if analyze_btn:
+                    st.info('Sentiment Analysis started...')
+                    sentiment_analysis(df)
+                    st.success('Sentiment Analysis executed successfully!')
+                    with DBConnection(SERVER, DATABASE, DB_USERNAME, DB_PASSWORD) as db:
+                        df = db.read_reviews_to_df('eng')
+                    st.write(df)
+            else:
+                st.write(df_main)
 
-    with visualizations:
-        st.header('Data Visualization')
-        st.text('Score Distribution')
-        ax = df['score'].value_counts().sort_index()
-        st.bar_chart(ax)
+            with visualizations:
+                st.header('Data Visualization')
+                st.text('Score Distribution')
+                ax = df['score'].value_counts().sort_index()
+                st.bar_chart(ax)
 
-        fig, axs = plt.subplots(1, 2, figsize=(12, 3))
-        sns.barplot(data=df, x='score', y='pos', ax=axs[0], palette="Blues_d")
-        sns.barplot(data=df, x='score', y='neg', ax=axs[1], palette="Blues_d")
-        axs[0].set_title('Positive')
-        axs[1].set_title('Negative')
-        plt.tight_layout()
-        plt.show()
-        st.pyplot()
+                st.text('Strengths')
+                positive_text = " ".join(cat for cat in df.advantage.dropna())
+                # Creating word_cloud with text as argument in .generate() method
+                wordcloud = WordCloud(collocations=False).generate(positive_text)
+                # Display the generated Word Cloud
+                plt.imshow(wordcloud, interpolation='bilinear')
+                plt.axis("off")
+                plt.show()
+                st.pyplot()
 
-        st.text('Strengths')
-        positive_text = " ".join(cat for cat in df.advantage.dropna())
-        # Creating word_cloud with text as argument in .generate() method
-        wordcloud = WordCloud(collocations=False).generate(positive_text)
-        # Display the generated Word Cloud
-        plt.imshow(wordcloud, interpolation='bilinear')
-        plt.axis("off")
-        plt.show()
-        st.pyplot()
-
-        st.text('Weaknesses')
-        negative_text = " ".join(cat for cat in df.disadvantage.dropna())
-        # Creating word_cloud with text as argument in .generate() method
-        wordcloud = WordCloud(collocations=False).generate(negative_text)
-        # Display the generated Word Cloud
-        plt.imshow(wordcloud, interpolation='bilinear')
-        plt.axis("off")
-        plt.show()
-        st.pyplot()
+                st.text('Weaknesses')
+                negative_text = " ".join(cat for cat in df.disadvantage.dropna())
+                # Creating word_cloud with text as argument in .generate() method
+                wordcloud = WordCloud(collocations=False).generate(negative_text)
+                # Display the generated Word Cloud
+                plt.imshow(wordcloud, interpolation='bilinear')
+                plt.axis("off")
+                plt.show()
+                st.pyplot()
 
 elif selected == 'Russian Reviews':
     header = st.container()
